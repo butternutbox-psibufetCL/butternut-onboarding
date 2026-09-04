@@ -140,36 +140,110 @@ elif menu == "✍️ AI Mail Evaluator (QA)":
             except Exception as e:
                 st.error(f"Błąd komunikacji z API: {e}")
 
-# --- MODULE 4: ELEVENLABS VOICE SIMULATOR ---
+# --- MODULE 4: ELEVENLABS VOICE SIMULATOR WITH AUTOMATED QA REPORT ---
 elif menu == "📞 ElevenLabs Voice Simulator":
-    st.markdown("<h1 class='main-title'>📞 Symulator Infolinii Live (ElevenLabs AI Voice)</h1>", unsafe_allow_html=True)
-    st.write("Wybierz język szkolenia, nałóż słuchawki i kliknij przycisk połączenia poniżej!")
+    st.markdown("<h1 class='main-title'>📞 Symulator Infolinii Live + AI QA Scoring</h1>", unsafe_allow_html=True)
+    st.write("Przeprowadź rozmowę głosową z klientem. Po zakończeniu połączenia kliknij przycisk na dole, aby pobrać transkrypcję i otrzymać **automatyczną ocenę QA**!")
     
-    # Wybór języka przez konsultanta
-    selected_lang = st.selectbox("🌐 Wybierz język symulacji:", ["Angielski (Default)", "Czeski / Słowacki", "Polski"])
-    
-    # Słownik Agent ID zależnie od wybranego języka
-    agent_ids = {
-        "Angielski (Default)": st.secrets.get("ELEVENLABS_AGENT_ID", "agent_4701m1p0z8hrfsdrskps8dbntdjj"),
-        "Czeski / Słowacki": st.secrets.get("ELEVENLABS_AGENT_ID_CZ", "agent_4701m1p0z8hrfsdrskps8dbntdjj"),
-        "Polski": st.secrets.get("ELEVENLABS_AGENT_ID_PL", "agent_4701m1p0z8hrfsdrskps8dbntdjj")
-    }
-    
-    current_agent_id = agent_ids[selected_lang]
-    
-    st.info(f"💡 **Wybrany Język:** {selected_lang}. Połączenie odbierze trudny klient. Pamiętaj o zasadach **Tone of Bark** i użyciu imienia psa!")
-    
+    # Pobieranie Sekretów
+    ELEVENLABS_AGENT_ID = st.secrets.get("ELEVENLABS_AGENT_ID", "agent_4701m1p0z8hrfsdrskps8dbntdjj")
+    ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+
+    st.info("💡 **Zasady Symulacji:** Połączenie odbierze trudny klient. Pamiętaj o użyciu imienia psa, zasadach **Tone of Bark** i braku defensywy!")
+
+    # Widget ElevenLabs
     elevenlabs_widget_html = f"""
     <div style="text-align: center; padding: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-top: 15px;">
-        <h3 style="color: #2C3E50; margin-bottom: 5px;">🎙️ Połączenie Przychodzące ({selected_lang})</h3>
+        <h3 style="color: #2C3E50; margin-bottom: 5px;">🎙️ Połączenie Przychodzące (CZ / SK Customer)</h3>
         <p style="color: #636E72; font-size: 14px;">Kliknij poniższą słuchawkę i zezwól na dostęp do mikrofonu.</p>
         <br/>
-        <elevenlabs-convai agent-id="{current_agent_id}"></elevenlabs-convai>
+        <elevenlabs-convai agent-id="{ELEVENLABS_AGENT_ID}"></elevenlabs-convai>
         <script src="https://elevenlabs.io/convai-widget/index.js" async type="text/javascript"></script>
     </div>
     """
     
     st.components.v1.html(elevenlabs_widget_html, height=350)
+
+    st.markdown("---")
+    st.subheader("📊 Automatyczny Raport QA z Ostatniej Rozmowy")
+
+    # Przycisk pobierania transkrypcji i generowania oceny
+    if st.button("🔄 Pobierz Transkrypcję i Generuj Raport QA"):
+        if not ELEVENLABS_API_KEY:
+            st.error("⚠️ Brak `ELEVENLABS_API_KEY` w Streamlit Secrets! Dodaj klucz API, aby pobierać transkrypcje.")
+        elif not GEMINI_API_KEY:
+            st.error("⚠️ Brak `GEMINI_API_KEY` w Streamlit Secrets!")
+        else:
+            with st.spinner("Pobieranie transkrypcji z ElevenLabs i analiza AI..."):
+                try:
+                    import requests
+
+                    # Fetch last conversation for this agent via ElevenLabs REST API
+                    headers = {"xi-api-key": ELEVENLABS_API_KEY}
+                    url = f"https://api.elevenlabs.io/v1/convai/conversations?agent_id={ELEVENLABS_AGENT_ID}&page_size=1"
+                    
+                    response = requests.get(url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        conversations = data.get("conversations", [])
+                        
+                        if not conversations:
+                            st.warning("Nie znaleziono jeszcze żadnej zarejestrowanej rozmowy dla tego bota.")
+                        else:
+                            conversation_id = conversations[0]["conversation_id"]
+                            
+                            # Fetch detailed transcript
+                            details_url = f"https://api.elevenlabs.io/v1/convai/conversations/{conversation_id}"
+                            details_res = requests.get(details_url, headers=headers)
+                            
+                            if details_res.status_code == 200:
+                                conv_data = details_res.json()
+                                transcript = conv_data.get("transcript", [])
+                                
+                                formatted_transcript = ""
+                                for msg in transcript:
+                                    role = "Klient" if msg.get("role") == "agent" else "Konsultant"
+                                    text = msg.get("message", "")
+                                    formatted_transcript += f"{role}: {text}\n"
+
+                                # Wyświetlanie transkrypcji
+                                with st.expander("📝 Pokaż surową transkrypcję rozmowy"):
+                                    st.text(formatted_transcript)
+
+                                # Generowanie Oceny przez Gemini AI
+                                genai.configure(api_key=GEMINI_API_KEY)
+                                model = genai.GenerativeModel('gemini-1.5-flash')
+
+                                qa_prompt = f"""
+                                Jesteś Senior QA Leadem w Butternut Box / PsiBufet.
+                                Przeanalizuj poniższą transkrypcję rozmowy telefonicznej przeprowadzonej przez nowego konsultanta z klientem.
+
+                                TRANSKRYPCJA ROZMOWY:
+                                {formatted_transcript}
+
+                                KRYTERIA OCENY (QA RUBRIC):
+                                1. Tone of Bark (0-30 pkt): Czy konsultant użył imienia psa, okazał empatię i ciepło?
+                                2. Brak Zrzucania Winy (0-20 pkt): Czy konsultant uniknął zrzucania winy na kuriera i powoływania się na sztywny regulamin?
+                                3. Retencja i Język Korzyści (0-25 pkt): Czy poprawnie wyjaśnił zasadę subskrypcji i użył języka korzyści?
+                                4. Procedury Gesture Matrix (0-25 pkt): Czy zaoferował odpowiednie rozwiązanie (np. wstrzymanie dostaw, paczka zastępcza, dodanie produktów)?
+
+                                ZWRÓĆ RAPORT W FORMACIE:
+                                - **OGÓLNA OCENA:** [X/100 pkt]
+                                - **DECYZJA:** [ZALICZONE / DO POPRAWY]
+                                - **MOCNE STRONY:** [2-3 punkty]
+                                - **ELEMENTY DO POPRAWY:** [2-3 punkty z konkretnymi przykładami z rozmowy]
+                                """
+
+                                eval_response = model.generate_content(qa_prompt)
+                                st.success("✅ Raport QA wygenerowany pomyślnie!")
+                                st.markdown(eval_response.text)
+                            else:
+                                st.error("Nie udało się pobrać szczegółów transkrypcji.")
+                    else:
+                        st.error(f"Błąd API ElevenLabs: {response.status_code}")
+                except Exception as e:
+                    st.error(f"Wystąpił błąd podczas analizy: {e}")
 
 # --- MODULE 5: INTERACTIVE QUIZ ---
 elif menu == "🎮 Interactive Quiz":
