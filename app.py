@@ -28,7 +28,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- SIDEBAR NAVIGATION ---
-st.sidebar.image("https://butternutbox.com/static/images/logo.svg", width=180) if False else st.sidebar.title("🐶 PsiBufet Onboarding")
+st.sidebar.title("🐶 PsiBufet Onboarding")
 st.sidebar.markdown("---")
 
 user_name = st.sidebar.text_input("👤 Twoje Imię i Nazwisko:", value="Jan Kowalski")
