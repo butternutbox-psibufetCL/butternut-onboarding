@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import json
 
 # Weryfikacja dostępności Google Gemini SDK
 try:
@@ -148,8 +147,9 @@ elif menu == "📞 ElevenLabs Voice Simulator":
     
     st.info("💡 **Zasady Symulacji:** Połączenie odbierze trudny klient. Nie wiesz, z jakim problemem dzwoni! Pamiętaj o użyciu imienia psa, zasadach **Tone of Bark** i **Gesture Matrix**.")
     
-    # Podmień poniższy ciąg znaków na swój Agent ID z panelu ElevenLabs
-ELEVENLABS_AGENT_ID = "agent_4701m1p0z8hrfsdrskps8dbntdjj"    
+    # Pobieranie Agent ID z Secrets lub użycie wartości domyślnej
+    ELEVENLABS_AGENT_ID = st.secrets.get("ELEVENLABS_AGENT_ID", "agent_4701m1p0z8hrfsdrskps8dbntdjj")
+    
     elevenlabs_widget_html = f"""
     <div style="text-align: center; padding: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-top: 15px;">
         <h3 style="color: #2C3E50; margin-bottom: 5px;">🎙️ Połączenie Przychodzące (CZ / SK Customer)</h3>
