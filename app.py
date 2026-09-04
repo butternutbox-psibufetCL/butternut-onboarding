@@ -143,19 +143,28 @@ elif menu == "✍️ AI Mail Evaluator (QA)":
 # --- MODULE 4: ELEVENLABS VOICE SIMULATOR ---
 elif menu == "📞 ElevenLabs Voice Simulator":
     st.markdown("<h1 class='main-title'>📞 Symulator Infolinii Live (ElevenLabs AI Voice)</h1>", unsafe_allow_html=True)
-    st.write("Nałóż słuchawki z mikrofonem i kliknij przycisk połączenia poniżej, aby przeprowadzić **symulowaną rozmowę telefoniczną z klientem** przed wejściem na prawdziwą infolinię!")
+    st.write("Wybierz język szkolenia, nałóż słuchawki i kliknij przycisk połączenia poniżej!")
     
-    st.info("💡 **Zasady Symulacji:** Połączenie odbierze trudny klient. Nie wiesz, z jakim problemem dzwoni! Pamiętaj o użyciu imienia psa, zasadach **Tone of Bark** i **Gesture Matrix**.")
+    # Wybór języka przez konsultanta
+    selected_lang = st.selectbox("🌐 Wybierz język symulacji:", ["Angielski (Default)", "Czeski / Słowacki", "Polski"])
     
-    # Pobieranie Agent ID z Secrets lub użycie wartości domyślnej
-    ELEVENLABS_AGENT_ID = st.secrets.get("ELEVENLABS_AGENT_ID", "agent_4701m1p0z8hrfsdrskps8dbntdjj")
+    # Słownik Agent ID zależnie od wybranego języka
+    agent_ids = {
+        "Angielski (Default)": st.secrets.get("ELEVENLABS_AGENT_ID", "agent_4701m1p0z8hrfsdrskps8dbntdjj"),
+        "Czeski / Słowacki": st.secrets.get("ELEVENLABS_AGENT_ID_CZ", "agent_4701m1p0z8hrfsdrskps8dbntdjj"),
+        "Polski": st.secrets.get("ELEVENLABS_AGENT_ID_PL", "agent_4701m1p0z8hrfsdrskps8dbntdjj")
+    }
+    
+    current_agent_id = agent_ids[selected_lang]
+    
+    st.info(f"💡 **Wybrany Język:** {selected_lang}. Połączenie odbierze trudny klient. Pamiętaj o zasadach **Tone of Bark** i użyciu imienia psa!")
     
     elevenlabs_widget_html = f"""
     <div style="text-align: center; padding: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-top: 15px;">
-        <h3 style="color: #2C3E50; margin-bottom: 5px;">🎙️ Połączenie Przychodzące (CZ / SK Customer)</h3>
+        <h3 style="color: #2C3E50; margin-bottom: 5px;">🎙️ Połączenie Przychodzące ({selected_lang})</h3>
         <p style="color: #636E72; font-size: 14px;">Kliknij poniższą słuchawkę i zezwól na dostęp do mikrofonu.</p>
         <br/>
-        <elevenlabs-convai agent-id="{ELEVENLABS_AGENT_ID}"></elevenlabs-convai>
+        <elevenlabs-convai agent-id="{current_agent_id}"></elevenlabs-convai>
         <script src="https://elevenlabs.io/convai-widget/index.js" async type="text/javascript"></script>
     </div>
     """
