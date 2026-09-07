@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import json
 import hashlib
+from supabase import create_client, Client
 
 # Google Gemini SDK
 try:
@@ -19,17 +19,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- AUTHENTICATION & USER DATABASE SIMULATION ---
-if 'user_db' not in st.session_state:
-    # Prosta baza użytkowników zapisywana w sesji
-    st.session_state['user_db'] = {
-        "alex@butternutbox.com": {"password": hashlib.sha256("password123".encode()).hexdigest(), "name": "Alex Kowalski", "history": []}
-    }
+# --- SUPABASE INITIALIZATION ---
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
-if 'authenticated' not in st.session_state:
-    st.session_state['authenticated'] = False
-if 'current_user' not in st.session_state:
-    st.session_state['current_user'] = None
+@st.cache_resource
+def init_supabase() -> Client:
+    if SUPABASE_URL and SUPABASE_KEY:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return None
+
+supabase = init_supabase()
 
 # --- STYLING ---
 st.markdown("""
@@ -38,14 +38,24 @@ st.markdown("""
     .stButton>button { background-color: #FF9F43; color: white; border-radius: 8px; font-weight: bold; border: none; }
     .stButton>button:hover { background-color: #e08b35; color: white; }
     .scenario-card { background-color: #FFF9E6; border-left: 5px solid #FF9F43; padding: 18px; border-radius: 8px; margin-bottom: 15px; }
-    .intercom-note { background-color: #F1F2F6; border-left: 5px solid #2ED573; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIN / REGISTRATION SCREEN ---
+# --- AUTHENTICATION SESSION STATE ---
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+if 'current_user' not in st.session_state:
+    st.session_state['current_user'] = None
+if 'current_user_name' not in st.session_state:
+    st.session_state['current_user_name'] = None
+
+# --- LOGIN / REGISTRATION SCREEN (SUPABASE INTEGRATED) ---
 if not st.session_state['authenticated']:
     st.markdown("<h1 class='main-title'>🔒 Global Customer Love Onboarding Portal</h1>", unsafe_allow_html=True)
-    st.write("Please log in with your work email to start training and track your QA scores.")
+    st.write("Please log in with your work email to start training and track your QA scores in Supabase.")
+    
+    if not supabase:
+        st.error("⚠️ Supabase connection credentials missing in Streamlit Secrets! Please add SUPABASE_URL and SUPABASE_KEY.")
     
     tab_login, tab_register = st.tabs(["🔑 Login", "📝 Register New Account"])
     
@@ -54,14 +64,20 @@ if not st.session_state['authenticated']:
         login_pass = st.text_input("Password:", type="password", key="login_pass")
         
         if st.button("Log In"):
-            hashed_p = hashlib.sha256(login_pass.encode()).hexdigest()
-            if login_email in st.session_state['user_db'] and st.session_state['user_db'][login_email]['password'] == hashed_p:
-                st.session_state['authenticated'] = True
-                st.session_state['current_user'] = login_email
-                st.success("Successfully logged in!")
-                st.rerun()
+            if supabase and login_email and login_pass:
+                hashed_p = hashlib.sha256(login_pass.encode()).hexdigest()
+                res = supabase.table("users").select("*").eq("email", login_email).execute()
+                
+                if res.data and res.data[0]['password_hash'] == hashed_p:
+                    st.session_state['authenticated'] = True
+                    st.session_state['current_user'] = login_email
+                    st.session_state['current_user_name'] = res.data[0]['name']
+                    st.success("Successfully logged in!")
+                    st.rerun()
+                else:
+                    st.error("Invalid email or password.")
             else:
-                st.error("Invalid email or password.")
+                st.warning("Please enter your credentials.")
                 
     with tab_register:
         reg_name = st.text_input("Full Name:", key="reg_name")
@@ -69,10 +85,17 @@ if not st.session_state['authenticated']:
         reg_pass = st.text_input("Create Password:", type="password", key="reg_pass")
         
         if st.button("Create Profile"):
-            if reg_email and reg_pass and reg_name:
+            if supabase and reg_email and reg_pass and reg_name:
                 hashed_p = hashlib.sha256(reg_pass.encode()).hexdigest()
-                st.session_state['user_db'][reg_email] = {"password": hashed_p, "name": reg_name, "history": []}
-                st.success("Account created successfully! You can now log in.")
+                try:
+                    supabase.table("users").insert({
+                        "email": reg_email,
+                        "name": reg_name,
+                        "password_hash": hashed_p
+                    }).execute()
+                    st.success("Account created successfully in Supabase! You can now log in.")
+                except Exception as e:
+                    st.error(f"User registration failed: {e}")
             else:
                 st.warning("Please fill in all registration fields.")
     st.stop()
@@ -81,8 +104,6 @@ if not st.session_state['authenticated']:
 TRANSLATIONS = {
     "United Kingdom 🇬🇧": {
         "lang_code": "English", "curr": "£",
-        "title": "Global Onboarding Hub", "welcome": "Welcome back",
-        "nav_menu": "Training Channel:",
         "m_voice": "🎙️ Voice Simulator (Live Phone)", "m_email": "✉️ Email & Ticket Simulator",
         "m_chat": "💬 Live Chat & DM (IG/FB)", "m_social": "📱 Public Social Comments (FB/IG)",
         "m_matrix": "📘 Cheatsheet & Guidelines", "m_profile": "📊 My QA History & Profile",
@@ -91,8 +112,6 @@ TRANSLATIONS = {
     },
     "Czechia 🇨🇿": {
         "lang_code": "Czech", "curr": "Kč",
-        "title": "Globální Onboardingový Portál", "welcome": "Vítejte zpět",
-        "nav_menu": "Tréninkový Kanál:",
         "m_voice": "🎙️ Hlasový Simulátor (Živý Hovor)", "m_email": "✉️ Simulátor Emailů a Ticketů",
         "m_chat": "💬 Live Chat a Přímé Zprávy (IG/FB)", "m_social": "📱 Veřejné Komentáře (FB/IG)",
         "m_matrix": "📘 Tahák a Instrukce", "m_profile": "📊 Moje QA Historie a Profil",
@@ -101,8 +120,6 @@ TRANSLATIONS = {
     },
     "Slovakia 🇸🇰": {
         "lang_code": "Slovak", "curr": "€",
-        "title": "Globálny Onboardingový Portál", "welcome": "Vitajte späť",
-        "nav_menu": "Tréningový Kanál:",
         "m_voice": "🎙️ Hlasový Simulátor (Živý Hovor)", "m_email": "✉️ Simulátor Emailov a Ticketov",
         "m_chat": "💬 Live Chat a Priame Správy (IG/FB)", "m_social": "📱 Verejné Komentáre (FB/IG)",
         "m_matrix": "📘 Tahák a Inštrukcie", "m_profile": "📊 Moja QA História a Profil",
@@ -111,8 +128,6 @@ TRANSLATIONS = {
     },
     "Poland 🇵🇱": {
         "lang_code": "Polish", "curr": "zł",
-        "title": "Platforma Onboardingowa Customer Love", "welcome": "Witaj ponownie",
-        "nav_menu": "Wybież Kanał Treningowy:",
         "m_voice": "🎙️ Symulator Rozmów (Infolinia Live)", "m_email": "✉️ Symulator Email & Ticketów",
         "m_chat": "💬 Live Chat & DM (IG/FB)", "m_social": "📱 Publiczne Komentarze (FB/IG)",
         "m_matrix": "📘 Ściąga & Instrukcje", "m_profile": "📊 Moja Historia QA i Profil",
@@ -121,8 +136,6 @@ TRANSLATIONS = {
     },
     "Germany 🇩🇪": {
         "lang_code": "German", "curr": "€",
-        "title": "Globales Onboarding-Portal", "welcome": "Willkommen zurück",
-        "nav_menu": "Schulungskanal:",
         "m_voice": "🎙️ Sprachsimulator (Live-Anruf)", "m_email": "✉️ E-Mail- & Ticket-Simulator",
         "m_chat": "💬 Live-Chat & Direktnachrichten (IG/FB)", "m_social": "📱 Öffentliche Kommentare (FB/IG)",
         "m_matrix": "📘 Leitfaden & Richtlinien", "m_profile": "📊 Meine QA-Historie & Profil",
@@ -131,8 +144,6 @@ TRANSLATIONS = {
     },
     "Netherlands / Belgium 🇳🇱": {
         "lang_code": "Dutch", "curr": "€",
-        "title": "Mijn Onboarding Portaal", "welcome": "Welkom terug",
-        "nav_menu": "Trainingskanaal:",
         "m_voice": "🎙️ Spraaksimulator (Live Telefoongesprek)", "m_email": "✉️ E-mail- & Ticket Simulator",
         "m_chat": "💬 Live Chat & Directe Berichten (IG/FB)", "m_social": "📱 Openbare Reacties (FB/IG)",
         "m_matrix": "📘 Spiegbriefje & Richtlijnen", "m_profile": "📊 Mijn QA-Geschiedenis & Profiel",
@@ -141,37 +152,42 @@ TRANSLATIONS = {
     }
 }
 
-# --- SIDEBAR & MARKET SELECTOR ---
+# --- SIDEBAR & NAVIGATION ---
 st.sidebar.title("🐶 Customer Love Hub")
 
-selected_market = st.sidebar.selectbox(
-    "🌐 Market / Language:",
-    list(TRANSLATIONS.keys())
-)
-
+selected_market = st.sidebar.selectbox("🌐 Market / Language:", list(TRANSLATIONS.keys()))
 t = TRANSLATIONS[selected_market]
-user_info = st.session_state['user_db'][st.session_state['current_user']]
 
 st.sidebar.markdown("---")
-st.sidebar.write(f"👤 **User:** {user_info['name']}")
+st.sidebar.write(f"👤 **User:** {st.session_state['current_user_name']}")
 if st.sidebar.button("Log Out"):
     st.session_state['authenticated'] = False
     st.session_state['current_user'] = None
+    st.session_state['current_user_name'] = None
     st.rerun()
 
 st.sidebar.markdown("---")
-menu = st.sidebar.radio(
-    t["nav_menu"],
-    [t["m_voice"], t["m_email"], t["m_chat"], t["m_social"], t["m_matrix"], t["m_profile"]]
-)
+menu = st.sidebar.radio("Navigation:", [t["m_voice"], t["m_email"], t["m_chat"], t["m_social"], t["m_matrix"], t["m_profile"]])
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
 
-# PROMPT BASE FOR LOCALIZED SCENARIO GENERATION
+# HELPER: SAVE QA RESULT TO SUPABASE
+def save_qa_result(channel, market, result_text):
+    if supabase and st.session_state['current_user']:
+        try:
+            supabase.table("qa_history").insert({
+                "user_email": st.session_state['current_user'],
+                "channel": channel,
+                "market": market,
+                "result": result_text
+            }).execute()
+        except Exception as e:
+            st.error(f"Failed to save result to Supabase: {e}")
+
 SCENARIO_PROMPT = f"""
 You are an AI generating realistic customer queries for a fresh dog food company (Butternut Box / PsiBufet) in the {selected_market} market.
-The scenarios are based on real customer feedback from Trustpilot & Google Reviews (delivery issues with couriers, missed cut-offs, fussy dogs, food allergies, upset stomach, prices).
+The scenarios are based on real customer feedback from Trustpilot & Google Reviews.
 Language: Generate the scenario STRICTLY in {t['lang_code']}.
 Generate 1 random, highly detailed customer case including customer name, dog name & breed, and the issue.
 """
@@ -184,7 +200,7 @@ if menu == t["m_voice"]:
     elevenlabs_widget_html = f"""
     <div style="text-align: center; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
         <h3>🎙️ Live Call Session ({selected_market})</h3>
-        <p style="color: #636E72; font-size: 13px;">Put on your headset, receive the call, and practice Thoughtful Care in {t['lang_code']}!</p>
+        <p style="color: #636E72; font-size: 13px;">Receive the call and practice Thoughtful Care in {t['lang_code']}!</p>
         <br/>
         <elevenlabs-convai agent-id="{t['agent_id']}"></elevenlabs-convai>
         <script src="https://elevenlabs.io/convai-widget/index.js" async type="text/javascript"></script>
@@ -245,14 +261,7 @@ if menu == t["m_voice"]:
                                 res = model.generate_content(eval_prompt)
                                 st.success("✅ Evaluation Complete!")
                                 st.markdown(res.text)
-                                
-                                # Save to User Profile History
-                                st.session_state['user_db'][st.session_state['current_user']]['history'].append({
-                                    "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                    "channel": "Voice Simulator",
-                                    "market": selected_market,
-                                    "result": res.text[:200] + "..."
-                                })
+                                save_qa_result("Voice Simulator", selected_market, res.text)
                 else:
                     st.warning("No call conversations found for this agent.")
         except Exception as e:
@@ -289,14 +298,9 @@ elif menu == t["m_email"]:
                 """
                 res = model.generate_content(eval_prompt)
                 st.markdown(res.text)
-                st.session_state['user_db'][st.session_state['current_user']]['history'].append({
-                    "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "channel": "Email / Ticket",
-                    "market": selected_market,
-                    "result": res.text[:200] + "..."
-                })
+                save_qa_result("Email / Ticket", selected_market, res.text)
 
-# --- MODULE 3: CHAT / DM SIMULATOR ---
+# --- MODULE 3: CHAT SIMULATOR ---
 elif menu == t["m_chat"]:
     st.markdown(f"<h1 class='main-title'>{t['m_chat']}</h1>", unsafe_allow_html=True)
     
@@ -324,8 +328,9 @@ elif menu == t["m_chat"]:
                 """
                 res = model.generate_content(eval_prompt)
                 st.markdown(res.text)
+                save_qa_result("Live Chat / DM", selected_market, res.text)
 
-# --- MODULE 4: PUBLIC SOCIAL COMMENTS ---
+# --- MODULE 4: SOCIAL COMMENTS ---
 elif menu == t["m_social"]:
     st.markdown(f"<h1 class='main-title'>{t['m_social']}</h1>", unsafe_allow_html=True)
     
@@ -333,7 +338,7 @@ elif menu == t["m_social"]:
         if GEMINI_API_KEY:
             genai.configure(api_key=GEMINI_API_KEY)
             model = genai.GenerativeModel('gemini-3.6-flash')
-            prompt = SCENARIO_PROMPT + f" Generate a public Facebook or Instagram ad comment in {t['lang_code']} (e.g. complaining about prices, delivery delays, or asking public questions)."
+            prompt = SCENARIO_PROMPT + f" Generate a public Facebook or Instagram ad comment in {t['lang_code']}."
             res = model.generate_content(prompt)
             st.session_state['social_scenario'] = res.text
             
@@ -349,17 +354,17 @@ elif menu == t["m_social"]:
                 Evaluate this PUBLIC social media response in {t['lang_code']}.
                 COMMENT: {st.session_state['social_scenario']}
                 REPLY: {user_reply}
-                Check for brand reputation protection, friendliness, de-escalation, and moving to DM if personal data is needed.
+                Check brand protection, friendliness, and de-escalation.
                 """
                 res = model.generate_content(eval_prompt)
                 st.markdown(res.text)
+                save_qa_result("Social Media", selected_market, res.text)
 
-# --- MODULE 5: GUIDELINES & CHEATSHEET ---
+# --- MODULE 5: GUIDELINES ---
 elif menu == t["m_matrix"]:
     st.markdown(f"<h1 class='main-title'>{t['m_matrix']}</h1>", unsafe_allow_html=True)
     
     tab1, tab2 = st.tabs(["⭐ Thoughtful Care 10/10", "📋 Gesture Matrix"])
-    
     with tab1:
         st.subheader("AP Recommendation Framework (Thoughtful Care)[cite: 1]")
         df_tc = pd.DataFrame([
@@ -380,18 +385,25 @@ elif menu == t["m_matrix"]:
         ])
         st.table(df_gm)
 
-# --- MODULE 6: USER PROFILE & QA HISTORY ---
+# --- MODULE 6: PROFILE & SUPABASE HISTORY ---
 elif menu == t["m_profile"]:
     st.markdown(f"<h1 class='main-title'>{t['m_profile']}</h1>", unsafe_allow_html=True)
-    st.write(f"👤 **Advisor Name:** {user_info['name']}")
+    st.write(f"👤 **Advisor Name:** {st.session_state['current_user_name']}")
     st.write(f"📧 **Email:** {st.session_state['current_user']}")
     
     st.markdown("---")
-    st.subheader("📜 Completed Training Sessions & AI Reports")
+    st.subheader("📜 Completed Training Sessions & AI Reports (Live Supabase Stream)")
     
-    if user_info['history']:
-        for item in reversed(user_info['history']):
-            with st.expander(f"🗓️ {item['date']} - [{item['channel']}] Market: {item['market']}"):
-                st.write(item['result'])
-    else:
-        st.info("No training sessions recorded yet. Start practicing in the channels above!")
+    if supabase:
+        try:
+            history_res = supabase.table("qa_history").select("*").eq("user_email", st.session_state['current_user']).order("created_at", desc=True).execute()
+            records = history_res.data
+            
+            if records:
+                for item in records:
+                    with st.expander(f"🗓️ {item['created_at'][:16]} - [{item['channel']}] Market: {item['market']}"):
+                        st.write(item['result'])
+            else:
+                st.info("No training sessions recorded in Supabase yet. Start practicing in the channels above!")
+        except Exception as e:
+            st.error(f"Error fetching history from Supabase: {e}")
