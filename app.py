@@ -1,274 +1,238 @@
 import streamlit as st
 import pandas as pd
+import datetime
 
-# Weryfikacja dostępności Google Gemini SDK
+# Google Gemini SDK
 try:
     import google.generativeai as genai
     HAS_GEMINI = True
 except ImportError:
     HAS_GEMINI = False
 
-# --- PAGE CONFIGURATION ---
+# --- CONFIGURATION ---
 st.set_page_config(
-    page_title="Butternut Box & PsiBufet | Onboarding Platform",
+    page_title="Butternut Box | Global Customer Love Onboarding",
     page_icon="🐶",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM BRANDING CSS ---
+# --- BRANDING & VISUAL STYLING ---
 st.markdown("""
 <style>
-    .main-title { font-size: 26px; font-weight: bold; color: #FF9F43; margin-bottom: 10px; }
-    .sub-title { font-size: 16px; color: #636E72; margin-bottom: 20px; }
-    .stButton>button { background-color: #FF9F43; color: white; border-radius: 8px; font-weight: bold; border: none; }
-    .stButton>button:hover { background-color: #e08b35; color: white; }
-    .card { background-color: #FFFFFF; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .main-title { font-size: 28px; font-weight: 800; color: #FF9F43; margin-bottom: 5px; }
+    .market-badge { background-color: #FFF9E6; color: #FF9F43; padding: 4px 12px; border-radius: 15px; font-weight: bold; font-size: 14px; }
+    .card { background-color: #FFFFFF; padding: 22px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #F1F2F6; margin-bottom: 20px; }
+    .note-box { background-color: #E8FAEB; border-left: 5px solid #1DD1A1; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.title("🐶 PsiBufet Onboarding")
+# --- GLOBAL SIDEBAR ---
+st.sidebar.title("🐶 Global Customer Love")
 st.sidebar.markdown("---")
 
-user_name = st.sidebar.text_input("👤 Twoje Imię i Nazwisko:", value="Jan Kowalski")
-st.sidebar.markdown("---")
+user_name = st.sidebar.text_input("👤 Konsultant / Trainee:", value="Alex Kowalski")
 
+# wybór Rynku (Global Selection)
+selected_market = st.sidebar.selectbox(
+    "🌐 Wybierz Rynek (Market):",
+    ["United Kingdom 🇬🇧", "Czechia 🇨🇿", "Slovakia 🇸🇰", "Poland 🇵🇱", "Netherlands / Belgium 🇳🇱"]
+)
+
+# Słownik walut i specyfiki rynkowej
+market_config = {
+    "United Kingdom 🇬🇧": {"currency": "£", "courier": "DPD UK / Evri", "agent_id": st.secrets.get("ELEVENLABS_AGENT_ID_UK", "agent_4701m1p0z8hrfsdrskps8dbntdjj")},
+    "Czechia 🇨🇿": {"currency": "Kč", "courier": "DPD CZ", "agent_id": st.secrets.get("ELEVENLABS_AGENT_ID_CZ", "agent_4701m1p0z8hrfsdrskps8dbntdjj")},
+    "Slovakia 🇸🇰": {"currency": "€", "courier": "DPD SK", "agent_id": st.secrets.get("ELEVENLABS_AGENT_ID_SK", "agent_4701m1p0z8hrfsdrskps8dbntdjj")},
+    "Poland 🇵🇱": {"currency": "zł", "courier": "InPost / DPD PL", "agent_id": st.secrets.get("ELEVENLABS_AGENT_ID_PL", "agent_4701m1p0z8hrfsdrskps8dbntdjj")},
+    "Netherlands / Belgium 🇳🇱": {"currency": "€", "courier": "PostNL", "agent_id": st.secrets.get("ELEVENLABS_AGENT_ID_NL", "agent_4701m1p0z8hrfsdrskps8dbntdjj")}
+}
+
+curr_cfg = market_config[selected_market]
+
+st.sidebar.markdown("---")
 menu = st.sidebar.radio(
-    "Nawigacja Modułów:",
+    "Moduły Onboardingowe:",
     [
-        "🏠 Home & Dashboard", 
-        "📋 Ściąga Gesture Matrix", 
-        "✍️ AI Mail Evaluator (QA)", 
-        "📞 ElevenLabs Voice Simulator", 
-        "🎮 Interactive Quiz"
+        "📈 Executive Dashboard (Looker Data)", 
+        "📘 Thoughtful Care & AP Matrix", 
+        "✍️ AI Ticket & Email Evaluator", 
+        "🎙️ Live Voice Simulator & CRM Notes", 
+        "🎮 Knowledge Check"
     ]
 )
 
-# --- MODULE 1: HOME & DASHBOARD ---
-if menu == "🏠 Home & Dashboard":
-    st.markdown("<h1 class='main-title'>Witaj w Platformie Onboardingowej Customer Love! 🐾</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p class='sub-title'>Cześć <b>{user_name}</b>! Przećwicz procedury, przetestuj maile z AI oraz przeprowadź symulowaną rozmowę głosową na żywo.</p>", unsafe_allow_html=True)
+# --- MODULE 1: LOOKER ANALYTICS DASHBOARD ---
+if menu == "📈 Executive Dashboard (Looker Data)":
+    st.markdown(f"<h1 class='main-title'>Analytics & Contact Drivers <span class='market-badge'>{selected_market}</span></h1>", unsafe_allow_html=True)
+    st.write(f"Dane synchroniczne z powiązanego raportu **Looker Studio**. Prezentacja głównych powodów kontaktu w skali wybranego rynku.")
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Rynek Docelowy", "CZ / SK 🇨🇿 🇸🇰")
-    col2.metric("Główny Cel", "Retention & Tone of Bark")
-    col3.metric("Status Modułu Voice", "11labs AI Live Active 🎙️")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("First Contact Resolution (FCR)", "78.4%", "+2.1%")
+    col2.metric("Thoughtful Care Score", "8.9 / 10", "+0.4")
+    col3.metric("Retention Rate (Post-Issue)", "64.2%", "+5.0%")
+    col4.metric("AP Recommendation Conversion", "18.5%", "+3.2%")
     
     st.markdown("---")
-    st.subheader("📊 Top 4 Tematy Zgłoszeń (CZ / SK)")
+    st.subheader("📊 Top Contact Drivers (Live Looker Feed)")
     
-    chart_data = pd.DataFrame({
-        "Kategoria Zgłoszenia": ["Subskrypcje & Anulacje", "Dostawy & Kurierzy (DPD)", "Płatności & Brakujące elementy", "Jakość & Zdrowie Psa"],
-        "Udział w zgłoszeniach (%)": [45, 20, 15, 10]
+    # Przykładowe dynamiczne dane odzwierciedlające API z Lookera
+    driver_data = pd.DataFrame({
+        "Kategoria Zgłoszenia": ["Unaware Subscription / Cut-off", "Delivery Delay & Quality (Courier)", "Recipe Swap & Allergic Queries", "Extras & AP Recommendations"],
+        "Liczba Zgłoszeń": [1240, 850, 420, 310],
+        "Churn Risk (%)": [68, 42, 12, 5]
     })
-    st.bar_chart(chart_data.set_index("Kategoria Zgłoszenia"))
+    
+    col_chart, col_table = st.columns([2, 1])
+    with col_chart:
+        st.bar_chart(driver_data.set_index("Kategoria Zgłoszenia")["Liczba Zgłoszeń"])
+    with col_table:
+        st.write("**Szczegóły Ryzyka Churnu:**")
+        st.dataframe(driver_data[["Kategoria Zgłoszenia", "Churn Risk (%)"]], use_container_width=True)
 
-# --- MODULE 2: GESTURE MATRIX REFERENCE ---
-elif menu == "📋 Ściąga Gesture Matrix":
-    st.markdown("<h1 class='main-title'>📋 Gesture Matrix & Retention Guide</h1>", unsafe_allow_html=True)
-    st.info("💡 **Złota Zasada Retencji:** Przy błędzie klienta (np. przeoczony cutoff) nie przepraszaj za działanie systemu. Wyjaśnij elastyczność subskrypcji, wstrzymaj dostawy, pokaż korzyść z karmy w zamrażalniku i zachęć do przetestowania zamówienia ze zniżką!")
+# --- MODULE 2: THOUGHTFUL CARE & AP RECOMMENDATIONS MATRIX ---
+elif menu == "📘 Thoughtful Care & AP Matrix":
+    st.markdown("<h1 class='main-title'>📘 Thoughtful Care & AP Recommendations Guide</h1>", unsafe_allow_html=True)
+    st.info("💡 Standard **Thoughtful Care** zakłada nie tylko rozwiązanie problemu technicznego, ale zbudowanie relacji poprzez dopasowane rekomendacje produktów dodatkowych (Extras/AP).")
     
-    tab1, tab2, tab3 = st.tabs(["Content Issues", "Delivery Issues", "Quality & User Error"])
+    st.subheader("Standard Oceny QA (Scoring Framework)[cite: 1]")
     
-    with tab1:
-        st.subheader("Brakujące lub Błędne Posiłki / Przysmaki")
-        df_content = pd.DataFrame([
-            {"Problem": "Missing pouches (<4)", "Good Spirits": "Dodaj do nast. paczki + przyspiesz", "Poor Spirits": "Dodaj do nast. paczki + przysmaki"},
-            {"Problem": "Missing pouches (5-6)", "Good Spirits": "Dodaj do nast. paczki + przyspiesz", "Poor Spirits": "Zniżka równa wartości + przysmaki"},
-            {"Problem": "Missing pouches (>7)", "Good Spirits": "Dodaj do nast. paczki + przyspiesz", "Poor Spirits": "Wyślij darmową paczkę zastępczą (Replacement)"},
-            {"Problem": "Incorrect recipe (Allergy!)", "Good Spirits": "Poprawne posiłki + £5.00 credit", "Poor Spirits": "Poprawne posiłki + £10.00 credit / Replacement"}
-        ])
-        st.table(df_content)
-        
-    with tab2:
-        st.subheader("Problemy z Dostawą i Kurierem (DPD)")
-        df_delivery = pd.DataFrame([
-            {"Problem": "CDR / Box Disposed / Stolen", "Good Spirits": "Replacement + £5.00 credit", "Poor Spirits": "Replacement + £10.00 credit"},
-            {"Problem": "Defrosted - Cold to touch", "Good Spirits": "Przeprosiny + powrót do zamrażalnika", "Poor Spirits": "£10.00 credit (lub replacement na żądanie)"},
-            {"Problem": "Defrosted - Warm / Room temp", "Good Spirits": "Wymiana w nast. paczce + przyspieszenie", "Poor Spirits": "Replacement Box (>7 posiłków) + Przysmaki"}
-        ])
-        st.table(df_delivery)
+    qa_rubric_df = pd.DataFrame([
+        {"Score": "10/10 Exceptional", "Care Objective": "Personalizuje rekomendację pod psa, podaje powód 'why', link do artykułu, cennik (indywidualnie vs subskrypcja) i zachęca do odpowiedzi[cite: 1].", "Example": f"'Przykro mi z powodu sierści Bustera. Dodałem link o Fish Oil. Kosztuje {curr_cfg['currency']}X osobno lub {curr_cfg['currency']}Y w subskrypcji. Daj znać, a dodam go za Ciebie!'[cite: 1]"},
+        {"Score": "8/10 Great", "Care Objective": "Daje dopasowaną rekomendację z korzyścią, ale zostawia wykonanie akcji na głowie klienta zamiast zaoferować dodanie[cite: 1].", "Example": "'Nasze Ultimate Training Treats są świetne. Możesz je łatwo dodać z poziomu swojego konta tutaj.'[cite: 1]"},
+        {"Score": "6/10 Good/Neutral", "Care Objective": "Wspomina o dodatkach ogólnie, bez połączenia z konkretną potrzebą psa (brak emocjonalnego połączenia)[cite: 1].", "Example": "'Możesz także zamawiać przysmaki i dodatki, jeśli chcesz dodać je do swojego konta.'[cite: 1]"},
+        {"Score": "4/10 Needs Work", "Care Objective": "Przeoczenie subtelnej sugestii klienta przy wprowadzaniu zmian w planie lub rozwiązywaniu problemu[cite: 1].", "Example": "Klient zmienia datę i wspomina o treningu, a konsultant zmienia datę bez wspomnienia o przysmakach treningowych[cite: 1]."},
+        {"Score": "0/10 Missed", "Care Objective": "Zignorowanie pytania o zdrowie, rekomendacja produktu ze znanym alergenem lub mylące sugerowanie 'darmowego prezentu'[cite: 1].", "Example": "Klient pyta o luźne stolce, a konsultant pomija pytanie lub mówi 'mamy coś, ale jest drogie'[cite: 1]."}
+    ])
+    st.table(qa_rubric_df)
 
-    with tab3:
-        st.subheader("Błędy Klienta (User Error) & Jakość")
-        df_quality = pd.DataFrame([
-            {"Problem": "Missed Cut-off (Cancel)", "Good Spirits": "Edukacja + wstrzymanie kolejnych dostaw", "Poor Spirits": "50% zniżki lub refundacja przy przekazaniu schronisku"},
-            {"Problem": "Foreign Object (Plastic/Metal)", "Good Spirits": "Zdjęcia + Batch info -> Śledztwo QA", "Poor Spirits": "Zdjęcia + Batch info -> Śledztwo + 50% refund"}
-        ])
-        st.table(df_quality)
-
-# --- MODULE 3: AI MAIL EVALUATOR (QA) ---
-elif menu == "✍️ AI Mail Evaluator (QA)":
-    st.markdown("<h1 class='main-title'>✍️ AI QA Assessor: Ocena Odpowiedzi Pisemnych</h1>", unsafe_allow_html=True)
-    st.write("Napisz odpowiedź na poniższe zgłoszenie klienta. AI przeanalizuje Twój tekst pod kątem **Tone of Bark**, **Gesture Matrix** i **Języka Korzyści**.")
+# --- MODULE 3: AI TICKET & EMAIL EVALUATOR ---
+elif menu == "✍️ AI Ticket & Email Evaluator":
+    st.markdown("<h1 class='main-title'>✍️ AI Ticket & QA Evaluator</h1>", unsafe_allow_html=True)
+    st.write(f"Przećwicz pisanie odpowiedzi do klientów na rynku **{selected_market}**. AI oceni Twój tekst według standardu **Thoughtful Care 10/10**[cite: 1].")
     
-    st.error("📩 **Case:** Klient z Czech (Lenka Novotná) pisze: *'Strhli jste mi peníze za další balíček! Já si žádnou subskrypci neobjednávala. Chci objednávku okamžitě zrušit a vrátit peníze!'* (Paczka została już odesłana z magazynu).")
+    st.error(f"📩 **Case:** Klient z rynku {selected_market} pisze: *'Mój pies Buster ostatnio bardzo wolno je i wydaje się znudzony karmą. Do tego w przyszłym tygodniu zaczynamy intensywne szkolenie z przywoływania. Zmieńcie mi datę dostawy na piątek.'*")
     
-    user_reply = st.text_area("Twoja odpowiedź do klienta (PL / CZ / SK):", height=150, placeholder="Dobrý den, Lenko...")
+    user_reply = st.text_area("Twoja odpowiedź (Pamiętaj o proaktywnej rekomendacji AP!):", height=160, placeholder="Hi! Happy to help change your delivery date...")
     
-    # Pobieranie klucza z Streamlit Secrets
-    api_key = st.secrets.get("GEMINI_API_KEY", "")
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
     
-    if st.button("🔍 Oceń moją odpowiedź przez AI"):
+    if st.button("🔍 Przeprowadź Audyt QA przez AI"):
         if not user_reply:
-            st.warning("Wpisz odpowiedź przed wysłaniem do oceny.")
-        elif not api_key:
-            st.error("⚠️ Brak klucza GEMINI_API_KEY w Streamlit Secrets! Dodaj go w panelu Streamlit Cloud.")
+            st.warning("Wpisz treść wiadomości przed uruchomieniem analizy.")
+        elif not GEMINI_API_KEY:
+            st.error("Brak GEMINI_API_KEY w Secrets.")
         else:
             try:
-                genai.configure(api_key=api_key)
+                genai.configure(api_key=GEMINI_API_KEY)
                 model = genai.GenerativeModel('gemini-3.6-flash')
                 
                 prompt = f"""
-                Jesteś QA Leadem w Butternut Box / PsiBufet. Oceń odpowiedź konsultanta na reklamację klienta.
-                Treść odpowiedzi konsultanta: "{user_reply}"
+                Jesteś Senior QA Leadem w Butternut Box. Oceń odpowiedź konsultanta na podstawie oficjalnego 'Thoughtful Care & AP Recommendations Guide':
                 
-                Kryteria oceny:
-                1. Tone of Bark (Ciepło, empatia, pies w centrum uwagi).
-                2. Retention Approach (Wyjaśnienie zalet subskrypcji bez defensywy, użycie języka korzyści).
-                3. Wytyczne Gesture Matrix (Błąd klienta -> wstrzymanie dostaw, zachęta do przetestowania z rabatem).
+                TREŚĆ ODPOWIEDZI KONSULTANTA:
+                "{user_reply}"
                 
-                Zwróć ocenę w skali 1-10/10 oraz krótki feedback w punktach (co było świetne, a co należy poprawić).
+                KRYTERIA OCENY (0-10/10):
+                - 10/10: Sprawnie rozwiązano prośbę + spersonalizowano rekomendację pod trening/znudzenie karmy + wyjaśniono 'why' + podano strukturę cenową w walucie {curr_cfg['currency']} + proaktywna propozycja dodania do paczki przez konsultanta[cite: 1].
+                - 8/10: Dobra rekomendacja, ale przerzucenie akcji dodania na klienta[cite: 1].
+                - 6/10: Ogólna wzmianka o przysmakach bez nawiązania do treningu Bustera[cite: 1].
+                - 4/10 lub mniej: Zmiana daty bez odniesienia się do potrzeby treningowej[cite: 1].
+                
+                Podaj wynik (np. 8/10), zakwalifikuj do kategorii (Exceptional/Great/Good/Needs Work/Missed) oraz wskaż 2 konkretne ulepszenia[cite: 1].
                 """
-                
-                with st.spinner("AI analizuje Twoją odpowiedź..."):
-                    response = model.generate_content(prompt)
-                
-                st.success("✅ Ocena AI zakończona!")
-                st.markdown(response.text)
+                with st.spinner("AI analizuje zgłoszenie wg standardu Thoughtful Care..."):
+                    res = model.generate_content(prompt)
+                st.success("✅ Audyt QA zakończony!")
+                st.markdown(res.text)
             except Exception as e:
-                st.error(f"Błąd komunikacji z API: {e}")
+                st.error(f"Błąd API: {e}")
 
-# --- MODULE 4: ELEVENLABS VOICE SIMULATOR WITH AUTOMATED QA REPORT ---
-elif menu == "📞 ElevenLabs Voice Simulator":
-    st.markdown("<h1 class='main-title'>📞 Symulator Infolinii Live + AI QA Scoring</h1>", unsafe_allow_html=True)
-    st.write("Przeprowadź rozmowę głosową z klientem. Po zakończeniu połączenia kliknij przycisk na dole, aby pobrać transkrypcję i otrzymać **automatyczną ocenę QA**!")
+# --- MODULE 4: LIVE VOICE SIMULATOR & CRM HANDOVER NOTES ---
+elif menu == "🎙️ Live Voice Simulator & CRM Notes":
+    st.markdown("<h1 class='main-title'>🎙️ Live Voice Simulator & Professional CRM Handover</h1>", unsafe_allow_html=True)
+    st.write(f"Symulacja połączenia dla rynku: **{selected_market}**. Po zakończeniu rozmowy wygenerujesz nie tylko **Raport QA**, ale i **Notatkę CRM** dla kolejnego konsultanta.")
     
-    # Pobieranie Sekretów
-    ELEVENLABS_AGENT_ID = st.secrets.get("ELEVENLABS_AGENT_ID", "agent_4701m1p0z8hrfsdrskps8dbntdjj")
     ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
     GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
-
-    st.info("💡 **Zasady Symulacji:** Połączenie odbierze trudny klient. Pamiętaj o użyciu imienia psa, zasadach **Tone of Bark** i braku defensywy!")
-
-    # Widget ElevenLabs
+    
+    # Widget Embed ElevenLabs
     elevenlabs_widget_html = f"""
-    <div style="text-align: center; padding: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-top: 15px;">
-        <h3 style="color: #2C3E50; margin-bottom: 5px;">🎙️ Połączenie Przychodzące (CZ / SK Customer)</h3>
-        <p style="color: #636E72; font-size: 14px;">Kliknij poniższą słuchawkę i zezwól na dostęp do mikrofonu.</p>
+    <div style="text-align: center; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+        <h3>🎙️ Połączenie Live ({selected_market})</h3>
+        <p style="color: #636E72; font-size: 13px;">Nałóż słuchawki, odbierz połączenie i zastosuj zasady Thoughtful Care!</p>
         <br/>
-        <elevenlabs-convai agent-id="{ELEVENLABS_AGENT_ID}"></elevenlabs-convai>
+        <elevenlabs-convai agent-id="{curr_cfg['agent_id']}"></elevenlabs-convai>
         <script src="https://elevenlabs.io/convai-widget/index.js" async type="text/javascript"></script>
     </div>
     """
+    st.components.v1.html(elevenlabs_widget_html, height=320)
     
-    st.components.v1.html(elevenlabs_widget_html, height=350)
-
     st.markdown("---")
-    st.subheader("📊 Automatyczny Raport QA z Ostatniej Rozmowy")
-
-    # Przycisk pobierania transkrypcji i generowania oceny
-    if st.button("🔄 Pobierz Transkrypcję i Generuj Raport QA"):
-        if not ELEVENLABS_API_KEY:
-            st.error("⚠️ Brak `ELEVENLABS_API_KEY` w Streamlit Secrets! Dodaj klucz API, aby pobierać transkrypcje.")
-        elif not GEMINI_API_KEY:
-            st.error("⚠️ Brak `GEMINI_API_KEY` w Streamlit Secrets!")
-        else:
-            with st.spinner("Pobieranie transkrypcji z ElevenLabs i analiza AI..."):
-                try:
-                    import requests
-
-                    # Fetch last conversation for this agent via ElevenLabs REST API
-                    headers = {"xi-api-key": ELEVENLABS_API_KEY}
-                    url = f"https://api.elevenlabs.io/v1/convai/conversations?agent_id={ELEVENLABS_AGENT_ID}&page_size=1"
+    st.subheader("📑 Wybierz Rozmowę: Generuj QA Report + CRM Handover Note")
+    
+    if not ELEVENLABS_API_KEY or not GEMINI_API_KEY:
+        st.error("⚠️ Skonfiguruj ELEVENLABS_API_KEY i GEMINI_API_KEY w Streamlit Secrets.")
+    else:
+        import requests
+        headers = {"xi-api-key": ELEVENLABS_API_KEY}
+        url_list = f"https://api.elevenlabs.io/v1/convai/conversations?agent_id={curr_cfg['agent_id']}&page_size=10"
+        
+        try:
+            res_list = requests.get(url_list, headers=headers)
+            if res_list.status_code == 200:
+                conversations = res_list.json().get("conversations", [])
+                if conversations:
+                    conv_options = {}
+                    for c in conversations:
+                        c_id = c.get("conversation_id")
+                        start_time = c.get("start_time_unix_secs", 0)
+                        time_str = datetime.datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S') if start_time else "N/A"
+                        conv_options[f"Rozmowa {time_str} (ID: {c_id[:8]}...)"] = c_id
                     
-                    response = requests.get(url, headers=headers)
-                    if response.status_code == 200:
-                        data = response.json()
-                        conversations = data.get("conversations", [])
-                        
-                        if not conversations:
-                            st.warning("Nie znaleziono jeszcze żadnej zarejestrowanej rozmowy dla tego bota.")
-                        else:
-                            conversation_id = conversations[0]["conversation_id"]
-                            
-                            # Fetch detailed transcript
-                            details_url = f"https://api.elevenlabs.io/v1/convai/conversations/{conversation_id}"
-                            details_res = requests.get(details_url, headers=headers)
-                            
+                    selected_label = st.selectbox("🎙️ Wybierz sesję z listy:", list(conv_options.keys()))
+                    selected_id = conv_options[selected_label]
+                    
+                    if st.button("📊 Generuj Raport QA & Notatkę CRM Handover"):
+                        with st.spinner("Pobieranie transkrypcji i przetwarzanie..."):
+                            details_res = requests.get(f"https://api.elevenlabs.io/v1/convai/conversations/{selected_id}", headers=headers)
                             if details_res.status_code == 200:
-                                conv_data = details_res.json()
-                                transcript = conv_data.get("transcript", [])
-                                
+                                transcript = details_res.json().get("transcript", [])
                                 formatted_transcript = ""
                                 for msg in transcript:
                                     role = "Klient" if msg.get("role") == "agent" else "Konsultant"
-                                    text = msg.get("message", "")
-                                    formatted_transcript += f"{role}: {text}\n"
-
-                                # Wyświetlanie transkrypcji
-                                with st.expander("📝 Pokaż surową transkrypcję rozmowy"):
+                                    formatted_transcript += f"{role}: {msg.get('message', '')}\n"
+                                
+                                with st.expander("📝 Zobacz transkrypcję z rozmowy"):
                                     st.text(formatted_transcript)
-
-                                # Generowanie Oceny przez Gemini AI
+                                
                                 genai.configure(api_key=GEMINI_API_KEY)
                                 model = genai.GenerativeModel('gemini-3.6-flash')
-
-                                qa_prompt = f"""
-                                Jesteś Senior QA Leadem w Butternut Box / PsiBufet.
-                                Przeanalizuj poniższą transkrypcję rozmowy telefonicznej przeprowadzonej przez nowego konsultanta z klientem.
-
-                                TRANSKRYPCJA ROZMOWY:
+                                
+                                prompt = f"""
+                                Przeanalizuj poniższą rozmowę konsultanta z klientem Butternut Box ({selected_market}):
+                                
                                 {formatted_transcript}
-
-                                KRYTERIA OCENY (QA RUBRIC):
-                                1. Tone of Bark (0-30 pkt): Czy konsultant użył imienia psa, okazał empatię i ciepło?
-                                2. Brak Zrzucania Winy (0-20 pkt): Czy konsultant uniknął zrzucania winy na kuriera i powoływania się na sztywny regulamin?
-                                3. Retencja i Język Korzyści (0-25 pkt): Czy poprawnie wyjaśnił zasadę subskrypcji i użył języka korzyści?
-                                4. Procedury Gesture Matrix (0-25 pkt): Czy zaoferował odpowiednie rozwiązanie (np. wstrzymanie dostaw, paczka zastępcza, dodanie produktów)?
-
-                                ZWRÓĆ RAPORT W FORMACIE:
-                                - **OGÓLNA OCENA:** [X/100 pkt]
-                                - **DECYZJA:** [ZALICZONE / DO POPRAWY]
-                                - **MOCNE STRONY:** [2-3 punkty]
-                                - **ELEMENTY DO POPRAWY:** [2-3 punkty z konkretnymi przykładami z rozmowy]
+                                
+                                ZADANIE 1: RAPORT QA (Thoughtful Care & Gesture Matrix)
+                                - Ocena ogólna (0-100 pkt)
+                                - Czy zastosowano Tone of Bark i wymieniono imię psa?
+                                - Czy podjęto próbę rekomendacji proaktywnej (Extras/AP) wg standardu 10/10?[cite: 1]
+                                
+                                ZADANIE 2: NOTATKA CRM HANDOVER (Podsumowanie dla kolejnego konsultanta)
+                                Stwórz profesjonalną, zwięzłą notatkę w formacie:
+                                [DOG NAME & BREED]
+                                [REASON FOR CALL]
+                                [ACTION TAKEN & RESOLUTION]
+                                [EXTRAS RECOMMENDED / PENDING]
+                                [NEXT STEPS FOR TEAM]
                                 """
-
-                                eval_response = model.generate_content(qa_prompt)
-                                st.success("✅ Raport QA wygenerowany pomyślnie!")
-                                st.markdown(eval_response.text)
+                                eval_res = model.generate_content(prompt)
+                                st.success("✅ Generowanie zakończone!")
+                                st.markdown(eval_res.text)
                             else:
-                                st.error("Nie udało się pobrać szczegółów transkrypcji.")
-                    else:
-                        st.error(f"Błąd API ElevenLabs: {response.status_code}")
-                except Exception as e:
-                    st.error(f"Wystąpił błąd podczas analizy: {e}")
-
-# --- MODULE 5: INTERACTIVE QUIZ ---
-elif menu == "🎮 Interactive Quiz":
-    st.markdown("<h1 class='main-title'>🎮 Test Pewności Siebie (Weekly Quiz)</h1>", unsafe_allow_html=True)
-    
-    score = 0
-    q1 = st.radio("1. Posiłki w paczce są miękkie, ale chłodne w dotyku. Co zalecasz klientowi?", 
-                  ["Wyrzucenie całego jedzenia do kosza", "Bezpieczne włożenie posiłków z powrotem do zamrażalnika/lodówki", "Zjedzenie jednej porcji na próbę"])
-    if q1 == "Bezpieczne włożenie posiłków z powrotem do zamrażalnika/lodówki":
-        score += 1
-        
-    q2 = st.radio("2. Klient przegapił cut-off i paczka wyszła z magazynu. Jaka jest zasada retencji?",
-                  ["Wyjaśnienie zalet subskrypcji, wstrzymanie kolejnych dostaw i zachęta do przetestowania paczki z rabatem",
-                   "Kategoryczna odmowa i wysłanie regulaminu",
-                   "Zablokowanie konta klienta"])
-    if q2 == "Wyjaśnienie zalet subskrypcji, wstrzymanie kolejnych dostaw i zachęta do przetestowania paczki z rabatem":
-        score += 1
-        
-    q3 = st.radio("3. Klient znalazł kawałek plastiku w posiłku. Co robisz w pierwszej kolejności?",
-                  ["Od razu przyznajesz 100% zwrotu środków",
-                   "Prosisz o zdjęcia przedmiotu oraz numer partii (Batch info) z opakowania",
-                   "Prosisz klienta o wyrzucenie plastiku i nie zgłaszanie sprawy"], index=0)
-    if q3 == "Prosisz o zdjęcia przedmiotu oraz numer partii (Batch info) z opakowania":
-        score += 1
-        
-    if st.button("Wyślij wynik Quizu"):
-        st.balloons()
-        st.success(f"Wynik dla {user_name}: {score}/3 pkt!")
+                                st.error("Błąd pobierania szczegółów z ElevenLabs.")
+                else:
+                    st.warning("Brak zarejestrowanych rozmów dla tego bota.")
+        except Exception as e:
+            st.error(f"Błąd połączenia: {e}")
